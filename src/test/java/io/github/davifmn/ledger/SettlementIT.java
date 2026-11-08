@@ -5,6 +5,7 @@ import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import io.github.davifmn.ledger.settlement.SettlementMath;
 import io.github.davifmn.ledger.settlement.SettlementService;
 import io.github.davifmn.ledger.settlement.SettlementService.SettlementView;
@@ -142,7 +143,9 @@ class SettlementIT extends IntegrationTest {
         ConsumerRecord<String, String> event = consumeUntil("ledger.events", r -> tradeId.equals(r.key()));
         assertThat(new String(event.headers().lastHeader("event_type").value(), StandardCharsets.UTF_8))
                 .isEqualTo("TradeSettled");
-        assertThat(event.value()).contains("\"trade_id\":\"" + tradeId + "\"").contains("\"entry_id\"");
+        assertThat(JsonPath.<String>read(event.value(), "$.trade_id")).isEqualTo(tradeId);
+        assertThat(JsonPath.<Integer>read(event.value(), "$.entry_id")).isPositive();
+        assertThat(JsonPath.<String>read(event.value(), "$.event_id")).isNotBlank();
     }
 
     @Test
