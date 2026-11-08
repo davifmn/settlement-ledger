@@ -1,0 +1,79 @@
+spring:
+  application:
+    name: settlement-ledger
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ledger}
+    username: ${DB_USER:ledger}
+    password: ${DB_PASSWORD:ledger}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: settlement-ledger
+      auto-offset-reset: earliest
+      properties:
+        isolation.level: read_committed
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+    listener:
+      concurrency: ${LEDGER_CONSUMER_CONCURRENCY:3}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 500ms
+  mvc:
+    problemdetails:
+      enabled: true
+
+ledger:
+  fee-bps: ${LEDGER_FEE_BPS:2}
+  topics:
+    trades: trades.executed
+    events: ledger.events
+    partitions: ${LEDGER_TOPIC_PARTITIONS:3}
+    replicas: ${LEDGER_TOPIC_REPLICAS:1}
+  outbox:
+    batch-size: 100
+    poll-interval-ms: 200
+  sepa:
+    batch-size: 200
+    max-amount-cents: 100000000
+    settlement-interval-ms: ${LEDGER_SEPA_SETTLEMENT_INTERVAL_MS:5000}
+    initial-delay-ms: 5000
+    virtual-iban-bank-code: "99999999"
+  rate-limit:
+    requests-per-minute: ${LEDGER_RATE_LIMIT_PER_MINUTE:600}
+  simulator:
+    enabled: ${LEDGER_SIMULATOR_ENABLED:false}
+  invariants:
+    check-interval-ms: 15000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        # Redis is a fast path, not a dependency: without it the service still answers
+        # correctly (see docs/adr/0005), so it does not take the pod out of rotation.
+        readiness:
+          include: readinessState,db
+  metrics:
+    distribution:
+      percentiles-histogram:
+        ledger.settlement.lag: true
+        http.server.requests: true
+  observations:
+    key-values:
+      application: settlement-ledger

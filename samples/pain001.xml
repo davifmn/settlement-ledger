@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- pain.001: participant ALICE (virtual IBAN DE43999999990001000001) pays two creditors at other banks. -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09">
+  <CstmrCdtTrfInitn>
+    <GrpHdr>
+      <MsgId>ALICE-20261108-001</MsgId>
+      <CreDtTm>2026-11-08T09:30:00Z</CreDtTm>
+      <NbOfTxs>2</NbOfTxs>
+      <CtrlSum>1250.50</CtrlSum>
+      <InitgPty><Nm>Alice Trading</Nm></InitgPty>
+    </GrpHdr>
+    <PmtInf>
+      <PmtInfId>PMT-001</PmtInfId>
+      <PmtMtd>TRF</PmtMtd>
+      <ReqdExctnDt><Dt>2026-11-08</Dt></ReqdExctnDt>
+      <Dbtr><Nm>Alice Trading</Nm></Dbtr>
+      <DbtrAcct><Id><IBAN>DE43999999990001000001</IBAN></Id></DbtrAcct>
+      <DbtrAgt><FinInstnId><BICFI>LEDGDEFFXXX</BICFI></FinInstnId></DbtrAgt>
+      <CdtTrfTxInf>
+        <PmtId><EndToEndId>INV-2026-0042</EndToEndId></PmtId>
+        <Amt><InstdAmt Ccy="EUR">1000.00</InstdAmt></Amt>
+        <CdtrAgt><FinInstnId><BICFI>COBADEFFXXX</BICFI></FinInstnId></CdtrAgt>
+        <Cdtr><Nm>Berlin Office Supplies GmbH</Nm></Cdtr>
+        <CdtrAcct><Id><IBAN>DE89370400440532013000</IBAN></Id></CdtrAcct>
+        <RmtInf><Ustrd>Invoice 2026-0042</Ustrd></RmtInf>
+      </CdtTrfTxInf>
+      <CdtTrfTxInf>
+        <PmtId><EndToEndId>RENT-NOV-2026</EndToEndId></PmtId>
+        <Amt><InstdAmt Ccy="EUR">250.50</InstdAmt></Amt>
+        <Cdtr><Nm>Zurich Flats AG</Nm></Cdtr>
+        <CdtrAcct><Id><IBAN>CH9300762011623852957</IBAN></Id></CdtrAcct>
+        <RmtInf><Ustrd>Rent November</Ustrd></RmtInf>
+      </CdtTrfTxInf>
+    </PmtInf>
+  </CstmrCdtTrfInitn>
+</Document>

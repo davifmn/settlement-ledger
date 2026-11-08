@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- pacs.008: the clearing bank forwards two incoming credits for participants ALICE and BOB. -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08">
+  <FIToFICstmrCdtTrf>
+    <GrpHdr>
+      <MsgId>CLEARING-20261108-0007</MsgId>
+      <CreDtTm>2026-11-08T08:00:00Z</CreDtTm>
+      <NbOfTxs>2</NbOfTxs>
+      <SttlmInf><SttlmMtd>CLRG</SttlmMtd></SttlmInf>
+    </GrpHdr>
+    <CdtTrfTxInf>
+      <PmtId><InstrId>I-1</InstrId><EndToEndId>FUNDING-ALICE-1</EndToEndId></PmtId>
+      <IntrBkSttlmAmt Ccy="EUR">50000.00</IntrBkSttlmAmt>
+      <ChrgBr>SLEV</ChrgBr>
+      <Dbtr><Nm>Alice Private Account</Nm></Dbtr>
+      <DbtrAcct><Id><IBAN>FR1420041010050500013M02606</IBAN></Id></DbtrAcct>
+      <Cdtr><Nm>Alice Trading</Nm></Cdtr>
+      <CdtrAcct><Id><IBAN>DE43999999990001000001</IBAN></Id></CdtrAcct>
+      <RmtInf><Ustrd>Funding</Ustrd></RmtInf>
+    </CdtTrfTxInf>
+    <CdtTrfTxInf>
+      <PmtId><InstrId>I-2</InstrId><EndToEndId>FUNDING-BOB-1</EndToEndId></PmtId>
+      <IntrBkSttlmAmt Ccy="EUR">20000.00</IntrBkSttlmAmt>
+      <ChrgBr>SLEV</ChrgBr>
+      <Dbtr><Nm>Bob Holding BV</Nm></Dbtr>
+      <DbtrAcct><Id><IBAN>NL91ABNA0417164300</IBAN></Id></DbtrAcct>
+      <Cdtr><Nm>Bob</Nm></Cdtr>
+      <CdtrAcct><Id><IBAN>DE16999999990001000002</IBAN></Id></CdtrAcct>
+    </CdtTrfTxInf>
+  </FIToFICstmrCdtTrf>
+</Document>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- camt.053: the clearing bank's statement of the ledger's settlement account for one day. -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>STMT-20261108</MsgId>
+      <CreDtTm>2026-11-08T23:00:00Z</CreDtTm>
+    </GrpHdr>
+    <Stmt>
+      <Id>STMT-20261108-01</Id>
+      <Acct><Id><IBAN>DE93999999990000000001</IBAN></Id></Acct>
+      <Ntry>
+        <Amt Ccy="EUR">50000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Sts><Cd>BOOK</Cd></Sts>
+        <BookgDt><Dt>2026-11-08</Dt></BookgDt>
+        <NtryDtls><TxDtls><Refs><EndToEndId>FUNDING-ALICE-1</EndToEndId></Refs></TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="EUR">1000.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts><Cd>BOOK</Cd></Sts>
+        <BookgDt><Dt>2026-11-08</Dt></BookgDt>
+        <NtryDtls><TxDtls><Refs><EndToEndId>INV-2026-0042</EndToEndId></Refs></TxDtls></NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>
