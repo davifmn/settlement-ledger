@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ public class RateLimiter {
     private final Clock clock;
     private final Counter rejected;
 
+    @Autowired
     public RateLimiter(StringRedisTemplate redis, LedgerProperties props, MeterRegistry meters) {
         this(redis, props, meters, Clock.systemUTC());
     }
