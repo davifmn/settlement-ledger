@@ -1,0 +1,9 @@
+target
+web
+deploy
+docs
+scripts
+samples
+.git
+.github
+*.md

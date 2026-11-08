@@ -1,0 +1,20 @@
+# Images built in CI and loaded into kind (never pulled).
+ledger:
+  image:
+    repository: local/settlement-ledger
+    tag: ci
+    pullPolicy: Never
+  replicas: 2
+  sepaSettlementIntervalMs: 2000
+  simulatorEnabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 768Mi
+web:
+  image:
+    repository: local/settlement-ledger-web
+    tag: ci
+    pullPolicy: Never

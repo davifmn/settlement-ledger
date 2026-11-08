@@ -1,0 +1,7 @@
+settlement-ledger is installed.
+
+API:        kubectl port-forward svc/{{ include "ledger.fullname" . }} 8080:8080
+{{- if .Values.web.enabled }}
+Dashboard:  kubectl port-forward svc/{{ include "ledger.fullname" . }}-web 8081:80   (then open http://localhost:8081)
+{{- end }}
+Invariants: curl localhost:8080/api/admin/invariants

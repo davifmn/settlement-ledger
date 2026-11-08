@@ -1,0 +1,6 @@
+apiVersion: v2
+name: settlement-ledger
+description: Post-trade settlement and SEPA transfers on a double-entry ledger, with its dashboard
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

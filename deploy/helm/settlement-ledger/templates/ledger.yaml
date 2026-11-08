@@ -1,0 +1,165 @@
+{{- if not .Values.database.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "ledger.fullname" . }}-db
+  labels:
+    {{- include "ledger.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  password: {{ .Values.database.password | quote }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ledger.fullname" . }}
+  labels:
+    {{- include "ledger.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ledger
+spec:
+  replicas: {{ .Values.ledger.replicas }}
+  selector:
+    matchLabels:
+      {{- include "ledger.selector" . | nindent 6 }}
+      app.kubernetes.io/component: ledger
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        {{- include "ledger.selector" . | nindent 8 }}
+        app.kubernetes.io/component: ledger
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /actuator/prometheus
+    spec:
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      terminationGracePeriodSeconds: 40
+      enableServiceLinks: false # no KAFKA_PORT-style variables leaking into the config
+      containers:
+        - name: ledger
+          image: "{{ .Values.ledger.image.repository }}:{{ .Values.ledger.image.tag }}"
+          imagePullPolicy: {{ .Values.ledger.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DB_URL
+              value: {{ .Values.database.url | quote }}
+            - name: DB_USER
+              value: {{ .Values.database.user | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ledger.dbSecret" . }}
+                  key: password
+            - name: DB_POOL_SIZE
+              value: {{ .Values.database.poolSize | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.kafka.bootstrapServers | quote }}
+            - name: LEDGER_TOPIC_PARTITIONS
+              value: {{ .Values.kafka.topicPartitions | quote }}
+            - name: LEDGER_TOPIC_REPLICAS
+              value: {{ .Values.kafka.topicReplicas | quote }}
+            - name: REDIS_HOST
+              value: {{ .Values.redis.host | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.redis.port | quote }}
+            - name: LEDGER_CONSUMER_CONCURRENCY
+              value: {{ .Values.ledger.consumerConcurrency | quote }}
+            - name: LEDGER_FEE_BPS
+              value: {{ .Values.ledger.feeBps | quote }}
+            - name: LEDGER_SEPA_SETTLEMENT_INTERVAL_MS
+              value: {{ .Values.ledger.sepaSettlementIntervalMs | quote }}
+            - name: LEDGER_RATE_LIMIT_PER_MINUTE
+              value: {{ .Values.ledger.rateLimitPerMinute | quote }}
+            - name: LEDGER_SIMULATOR_ENABLED
+              value: {{ .Values.ledger.simulatorEnabled | quote }}
+            - name: SERVER_SHUTDOWN
+              value: graceful
+            {{- with .Values.ledger.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 3
+            failureThreshold: 40
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.ledger.resources | nindent 12 }}
+          securityContext:
+            {{- include "ledger.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ledger.fullname" . }}
+  labels:
+    {{- include "ledger.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ledger
+spec:
+  selector:
+    {{- include "ledger.selector" . | nindent 4 }}
+    app.kubernetes.io/component: ledger
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+{{- if .Values.podDisruptionBudget.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ledger.fullname" . }}
+  labels:
+    {{- include "ledger.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "ledger.selector" . | nindent 6 }}
+      app.kubernetes.io/component: ledger
+{{- end }}
+{{- if .Values.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "ledger.fullname" . }}
+  labels:
+    {{- include "ledger.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "ledger.selector" . | nindent 6 }}
+      app.kubernetes.io/component: ledger
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

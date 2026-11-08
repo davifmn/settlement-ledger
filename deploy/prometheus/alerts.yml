@@ -1,0 +1,58 @@
+# Each alert links to its procedure in docs/runbook.md.
+groups:
+  - name: settlement-ledger
+    rules:
+      - alert: LedgerInvariantBroken
+        expr: max(ledger_invariant_violations) > 0
+        for: 0m
+        labels:
+          severity: page
+        annotations:
+          summary: A ledger invariant is broken (unbalanced entry, balance drift or asset not summing to zero)
+          runbook: docs/runbook.md#ledgerinvariantbroken
+
+      - alert: OutboxBacklogGrowing
+        expr: max(ledger_outbox_backlog) > 1000
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Ledger events are not reaching Kafka ({{ $value }} waiting)
+          runbook: docs/runbook.md#outboxbackloggrowing
+
+      - alert: SettlementFailureRateHigh
+        expr: |
+          sum(rate(ledger_settlements_total{outcome="failed"}[10m]))
+            / clamp_min(sum(rate(ledger_settlements_total{outcome=~"settled|failed"}[10m])), 1e-9) > 0.05
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: More than 5% of trades are failing settlement
+          runbook: docs/runbook.md#settlementfailureratehigh
+
+      - alert: SettlementLagHigh
+        expr: histogram_quantile(0.99, sum by (le) (rate(ledger_settlement_lag_seconds_bucket[5m]))) > 5
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: p99 time from execution to settlement is above 5 s
+          runbook: docs/runbook.md#settlementlaghigh
+
+      - alert: ReconciliationBreaks
+        expr: sum(increase(ledger_reconciliation_breaks_total[1h])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: The bank statement and the ledger disagree
+          runbook: docs/runbook.md#reconciliationbreaks
+
+      - alert: RedisUnavailable
+        expr: sum(rate(ledger_idempotency_redis_unavailable_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Idempotency is running on the database fallback
+          runbook: docs/runbook.md#redisunavailable

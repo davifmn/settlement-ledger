@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (unit + integration tests with Testcontainers)
+    runs-on: ubuntu-24.04
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # SonarCloud needs the history for "new code"
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build and test (PostgreSQL, Kafka and Redis run in containers)
+        run: mvn -B verify
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-reports
+          path: |
+            target/surefire-reports
+            target/failsafe-reports
+            target/site/jacoco
+      # Runs once the SONAR_TOKEN secret exists (SonarCloud is free for public repositories).
+      - name: SonarCloud analysis
+        if: env.SONAR_TOKEN != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mvn -B -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.host.url=https://sonarcloud.io
+
+  web:
+    name: Dashboard (types, tests, build)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  config:
+    name: Helm chart and Prometheus rules
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+      - name: Lint and render the chart
+        run: |
+          helm lint deploy/helm/settlement-ledger
+          helm lint deploy/helm/settlement-ledger -f deploy/kind/values-kind.yaml
+          helm template t deploy/helm/settlement-ledger --set serviceMonitor.enabled=true > /dev/null
+      - name: Check the alert rules
+        run: |
+          docker run --rm -v "$PWD/deploy/prometheus:/etc/prometheus:ro" --entrypoint promtool \
+            prom/prometheus:v3.16.0 check config /etc/prometheus/prometheus.yml
+
+  compose:
+    name: End-to-end with docker compose + load test
+    needs: [backend, web]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start the stack
+        run: docker compose up --build -d --wait --wait-timeout 300
+      - name: Smoke test
+        run: bash scripts/smoke_test.sh http://localhost:8080
+      - name: The dashboard is served and proxies the API
+        run: |
+          curl -fsS http://localhost:8081/ | grep -q '<div id="root">'
+          curl -fsS http://localhost:8081/api/admin/invariants | jq -e .ok
+      - uses: grafana/setup-k6-action@v1
+      - name: Load test (50 transfers/s for 30 s, every 10th retried)
+        run: k6 run -e BASE_URL=http://localhost:8080 scripts/load/transfers.js
+      - name: Invariants still hold after the load
+        run: |
+          sleep 5
+          curl -fsS http://localhost:8080/api/admin/invariants | tee /dev/stderr | jq -e '.ok and .outboxBacklog < 100'
+      - name: Prometheus scrapes the ledger
+        run: |
+          for i in $(seq 1 20); do
+            curl -fsS 'http://localhost:9090/api/v1/query?query=ledger_invariant_violations' | jq -e '.data.result | length > 0' && exit 0
+            sleep 3
+          done
+          exit 1
+      - name: Logs
+        if: failure()
+        run: docker compose logs --tail=200 ledger web kafka
+
+  kubernetes:
+    name: Helm install on Kubernetes (kind)
+    needs: [backend, web, config]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+      - name: Build images
+        run: |
+          docker build -t local/settlement-ledger:ci .
+          docker build -t local/settlement-ledger-web:ci web
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: ledger
+      - name: Load images into the cluster
+        run: kind load docker-image local/settlement-ledger:ci local/settlement-ledger-web:ci --name ledger
+      - name: Dependencies (PostgreSQL, Kafka, Redis)
+        run: |
+          kubectl apply -f deploy/kind/dependencies.yaml
+          kubectl rollout status deploy/postgres deploy/redis deploy/kafka --timeout=180s
+      - name: Install the chart (2 ledger replicas + dashboard)
+        run: |
+          helm upgrade --install ledger deploy/helm/settlement-ledger -f deploy/kind/values-kind.yaml --wait --timeout 8m
+          kubectl get pods,svc
+      - name: Smoke test through the Service
+        run: |
+          kubectl port-forward svc/ledger-settlement-ledger 8080:8080 &
+          sleep 5
+          bash scripts/smoke_test.sh http://localhost:8080
+      - name: The dashboard proxies the API inside the cluster
+        run: |
+          kubectl port-forward svc/ledger-settlement-ledger-web 8081:80 &
+          sleep 3
+          curl -fsS http://localhost:8081/api/admin/invariants | jq -e .ok
+      - name: A rolling restart loses nothing
+        run: |
+          kubectl rollout restart deploy/ledger-settlement-ledger
+          kubectl rollout status deploy/ledger-settlement-ledger --timeout=5m
+          pkill -f "port-forward svc/ledger-settlement-ledger 8080" || true
+          kubectl port-forward svc/ledger-settlement-ledger 8080:8080 &
+          sleep 5
+          bash scripts/smoke_test.sh http://localhost:8080
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl get all
+          kubectl describe pods
+          kubectl logs -l app.kubernetes.io/component=ledger --tail=200 --prefix
+          kubectl logs deploy/kafka --tail=50

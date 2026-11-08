@@ -1,0 +1,60 @@
+ledger:
+  image:
+    repository: ghcr.io/davifmn/settlement-ledger
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  # Several replicas are safe: Kafka spreads partitions over them, and the outbox relay
+  # and SEPA cycles claim rows with FOR UPDATE SKIP LOCKED.
+  replicas: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 768Mi
+  consumerConcurrency: 3
+  feeBps: 2
+  sepaSettlementIntervalMs: 5000
+  rateLimitPerMinute: 600
+  simulatorEnabled: false
+  extraEnv: []
+
+web:
+  enabled: true
+  image:
+    repository: ghcr.io/davifmn/settlement-ledger-web
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+database:
+  url: jdbc:postgresql://postgres:5432/ledger
+  user: ledger
+  # Name of an existing Secret with a "password" key. If empty, the chart creates one
+  # from `password` below (fine for kind, not for production).
+  existingSecret: ""
+  password: ledger
+  poolSize: 20
+
+kafka:
+  bootstrapServers: kafka:9092
+  topicPartitions: 3
+  topicReplicas: 1
+
+redis:
+  host: redis
+  port: 6379
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: false
+  interval: 15s
