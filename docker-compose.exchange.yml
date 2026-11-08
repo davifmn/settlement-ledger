@@ -1,0 +1,38 @@
+# The whole chain: matching-engine (matchd) → its drop copy → Kafka → settlement-ledger.
+# Real trades instead of the simulator. Needs matching-engine checked out next to this
+# repository, or MATCHING_ENGINE_DIR pointing to it:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.exchange.yml up --build
+#   bash scripts/exchange_e2e.sh
+#
+# matchd listens on :8090 (the ledger has :8080). The drop copy reads matchd's journals
+# from the shared volume, read only, and publishes to trades.executed, which the ledger
+# creates at start-up (so the drop copy waits for the ledger).
+services:
+  matchd:
+    build: ${MATCHING_ENGINE_DIR:-../matching-engine}
+    ports:
+      - "8090:8080"
+    volumes:
+      - journals:/var/lib/matchd
+
+  dropcopy:
+    build:
+      context: ${MATCHING_ENGINE_DIR:-../matching-engine}
+      dockerfile: Dockerfile.dropcopy
+    environment:
+      DROPCOPY_BROKERS: kafka:9092
+      DROPCOPY_SYMBOLS: SAP
+    ports:
+      - "9100:9100"
+    volumes:
+      - journals:/var/lib/matchd:ro
+      - dropcopy-state:/var/lib/dropcopy
+    depends_on:
+      matchd: { condition: service_started }
+      ledger: { condition: service_healthy }
+    restart: on-failure
+
+volumes:
+  journals:
+  dropcopy-state:

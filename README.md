@@ -17,6 +17,10 @@ Java 21 · Spring Boot 4 · PostgreSQL · Kafka · Redis · React · Docker · H
   event are committed together or not at all.
 - **Operable.** Metrics, alert rules with a runbook for each, a Grafana dashboard, a Helm chart
   tested on Kubernetes (kind) including a rolling restart, and a k6 load test in CI.
+- **Connected to a real exchange.** matching-engine's drop copy follows the engine's journal and
+  publishes each trade with both accounts. `docker-compose.exchange.yml` runs the whole chain,
+  and `scripts/exchange_e2e.sh` kills the drop copy and the engine with `kill -9` while
+  trading, then checks that every trade settled exactly once.
 
 ```
                           trades.executed (key = symbol)                ledger.events
@@ -69,6 +73,14 @@ curl -s localhost:8080/api/admin/invariants
 # {"ok":true,"unbalancedEntries":0,"accountsWithDrift":0,"assetImbalances":{},"outboxBacklog":0}
 ```
 
+With the real exchange instead of the simulator (matching-engine checked out next to this
+repository):
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.exchange.yml up --build
+bash scripts/exchange_e2e.sh     # orders on matchd (:8090) → drop copy → Kafka → ledger
+```
+
 Without Docker: `mvn spring-boot:run` (needs PostgreSQL, Kafka and Redis on localhost) and
 `cd web && npm install && npm run dev`.
 
@@ -112,6 +124,8 @@ Errors are RFC 9457 problem details. Transfer rejections carry ISO 20022 reason 
 | Dashboard (`npm test`) | IBAN and amount parsing, the transfer form reusing its Idempotency-Key on retry, the settlements table |
 | End to end (CI) | `docker compose up`, then `scripts/smoke_test.sh` and a k6 load test (`scripts/load/transfers.js`), then the invariants again |
 | Kubernetes (CI) | the Helm chart on kind with 2 replicas, the smoke test through the Service, then a rolling restart and the smoke test again |
+| Contract | `TradeContractTest` settles the exact message matching-engine's drop copy produces; matching-engine has the same file and checks it produces it |
+| Whole chain (CI, `exchange-e2e.yml`) | matchd + drop copy + Kafka + ledger: 80 crossing orders, `kill -9` of the drop copy and of matchd in between; every trade the engine reported must be SETTLED and each participant's position must match the engine's fills |
 
 ### Measured in CI
 
@@ -169,7 +183,6 @@ docs/              ADRs, runbook, matching-engine integration
 - **Multi-currency.** FX entries, revaluation.
 - **Data lifecycle.** Archiving or partitioning of the journal and the outbox; Debezium
   instead of polling at higher volumes.
-- **The drop copy in matching-engine.** See [docs/integration-matching-engine.md](docs/integration-matching-engine.md).
 
 ## License
 

@@ -1,0 +1,54 @@
+# The whole chain with the real matching-engine: orders → drop copy → Kafka → ledger,
+# with kill -9 of the drop copy and of matchd (scripts/exchange_e2e.sh).
+#
+# It needs to read the matching-engine repository: automatic once that repository is
+# public; while it is private, add a MATCHING_ENGINE_TOKEN secret (a fine-grained token
+# with read access to its contents). Without either, the job reports that it was skipped.
+name: Exchange end-to-end
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exchange:
+    name: matching-engine → drop copy → Kafka → ledger
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Can we read matching-engine?
+        id: access
+        env:
+          GH_TOKEN: ${{ secrets.MATCHING_ENGINE_TOKEN || github.token }}
+        run: |
+          if gh api repos/davifmn/matching-engine --jq .full_name >/dev/null 2>&1; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipped: matching-engine is private and there is no MATCHING_ENGINE_TOKEN secret."
+          fi
+      - uses: actions/checkout@v7
+        if: steps.access.outputs.ok == 'true'
+        with:
+          repository: davifmn/matching-engine
+          token: ${{ secrets.MATCHING_ENGINE_TOKEN || github.token }}
+          path: .matching-engine
+      - name: Start the exchange and the ledger
+        if: steps.access.outputs.ok == 'true'
+        env:
+          MATCHING_ENGINE_DIR: .matching-engine
+        run: docker compose -f docker-compose.yml -f docker-compose.exchange.yml up --build -d --wait --wait-timeout 300
+      - name: End to end, with kill -9 of the drop copy and of matchd
+        if: steps.access.outputs.ok == 'true'
+        env:
+          MATCHING_ENGINE_DIR: .matching-engine
+        run: bash scripts/exchange_e2e.sh
+      - name: Logs
+        if: failure()
+        env:
+          MATCHING_ENGINE_DIR: .matching-engine
+        run: docker compose -f docker-compose.yml -f docker-compose.exchange.yml logs --tail=200 ledger dropcopy matchd
