@@ -137,6 +137,7 @@ On a standard GitHub-hosted runner, with everything in docker compose and **one*
 | k6: 50 outbound transfers/s for 30 s, every 10th retried with the same key | 1,489 transfers + 150 retries, **0 errors**; every retry returned the original transfer |
 | Latency of `POST /api/transfers` under that load | median 10 ms, p95 243 ms, p99 585 ms (includes JVM warm-up) |
 | After the load | invariants hold, outbox backlog 0 |
+| Whole chain with the real matching-engine (`exchange-e2e.yml`, run with a copy of the engine while both repositories are private) | 80 trades from crossing orders, with `kill -9` of the drop copy and later of matchd: all 80 SETTLED, and every participant's SAP position equal to the engine's fills |
 
 ## Operations
 
