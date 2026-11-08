@@ -16,6 +16,7 @@ import io.github.davifmn.ledger.sepa.Pain001;
 import io.github.davifmn.ledger.sepa.RejectReason;
 import io.github.davifmn.ledger.transfer.Transfer.Direction;
 import io.github.davifmn.ledger.transfer.Transfer.Status;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -81,6 +82,11 @@ public class TransferService {
         this.props = props;
         this.meters = meters;
         this.tx = new TransactionTemplate(txManager);
+        for (Direction direction : Direction.values()) {
+            for (Status status : List.of(Status.VALIDATED, Status.SETTLED, Status.REJECTED)) {
+                counter(direction, status); // registered at zero, see SettlementService
+            }
+        }
     }
 
     // ---------------------------------------------------------------- outbound
@@ -368,8 +374,12 @@ public class TransferService {
     }
 
     private void count(Direction direction, Status status) {
-        meters.counter("ledger.transfers", "direction", direction.name().toLowerCase(),
-                "status", status.name().toLowerCase()).increment();
+        counter(direction, status).increment();
+    }
+
+    private Counter counter(Direction direction, Status status) {
+        return meters.counter("ledger.transfers", "direction", direction.name().toLowerCase(),
+                "status", status.name().toLowerCase());
     }
 
     private static Map<String, Object> eventPayload(Transfer t) {

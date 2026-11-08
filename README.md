@@ -115,7 +115,7 @@ Errors are RFC 9457 problem details. Transfer rejections carry ISO 20022 reason 
 
 ### Measured in CI
 
-On a GitHub-hosted runner (4 vCPUs), with everything in docker compose and **one** ledger instance:
+On a standard GitHub-hosted runner, with everything in docker compose and **one** ledger instance:
 
 | Scenario | Result |
 |---|---|

@@ -98,6 +98,8 @@ echo "$report" | jq -e --arg r "$RUN" '[.breaks[] | select(.endToEndId | test($r
 step "7. invariants and metrics"
 curl -fsS "$BASE/api/admin/invariants" | jq -e .ok >/dev/null || fail "ledger invariant broken"
 metrics=$(curl -fsS "$BASE/actuator/prometheus")
-grep -q '^ledger_settlements_total' <<<"$metrics" || fail "metrics missing"
+for metric in ledger_invariant_violations ledger_outbox_backlog ledger_settlements_total ledger_transfers_total; do
+  grep -q "^$metric" <<<"$metrics" || fail "metric $metric missing"
+done
 
 printf '\nSMOKE TEST PASSED\n'

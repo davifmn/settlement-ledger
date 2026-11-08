@@ -59,6 +59,11 @@ public class SettlementService {
         this.lag = Timer.builder("ledger.settlement.lag")
                 .description("Time from execution to settlement")
                 .register(meters);
+        // Start every series at zero: alert expressions using rate() need them to exist
+        // on every replica, also on one that has not settled anything yet.
+        for (Outcome outcome : Outcome.values()) {
+            count(outcome, 0);
+        }
     }
 
     @Transactional
@@ -147,7 +152,11 @@ public class SettlementService {
     }
 
     private void count(Outcome outcome) {
-        meters.counter("ledger.settlements", "outcome", outcome.name().toLowerCase()).increment();
+        count(outcome, 1);
+    }
+
+    private void count(Outcome outcome, double amount) {
+        meters.counter("ledger.settlements", "outcome", outcome.name().toLowerCase()).increment(amount);
     }
 
     public List<SettlementView> recent(String status, int limit) {
